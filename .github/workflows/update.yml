@@ -63,10 +63,10 @@ jobs:
             chown -R builder:builder /pkg && \
             pacman -Syu --noconfirm --needed sudo git && \
             echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
-            su builder -c 'makepkg -s --noconfirm'
+            su builder -c 'makepkg -s --noconfirm' && \
+            cp keqdroid-bin-[0-9]*.pkg.tar.zst keqdroid-bin.pkg.tar.zst && \
+            chmod 777 keqdroid-bin.pkg.tar.zst /pkg
           "
-          PKG_FILE=$(ls -1 keqdroid-bin-*.pkg.tar.zst | head -n 1)
-          cp "$PKG_FILE" keqdroid-bin.pkg.tar.zst
 
       - name: Publish GitHub Release
         env:
