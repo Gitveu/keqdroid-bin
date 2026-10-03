@@ -3,7 +3,7 @@
 [![Update Check](https://github.com/Gitveu/keqdroid-bin/actions/workflows/update.yml/badge.svg)](https://github.com/Gitveu/keqdroid-bin/actions/workflows/update.yml)
 [![Upstream Version](https://img.shields.io/github/v/release/Lemonochka/keqdroid?label=upstream&color=blue)](https://github.com/Lemonochka/keqdroid/releases/latest)
 
-PKGBUILD for KEQDIS (keqdroid) proxy/VPN client with auto-updates.
+PKGBUILD for Keqdroid proxy/VPN client with auto-updates.
 
 ## Installation
 
