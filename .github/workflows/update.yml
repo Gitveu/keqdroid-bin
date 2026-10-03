@@ -1,4 +1,4 @@
-name: Check for upstream update
+name: Build and Release Package
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  update:
+  build-and-release:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -19,33 +19,61 @@ jobs:
         run: |
           LATEST_TAG=$(curl -s https://api.github.com/repos/Lemonochka/keqdroid/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
           NEW_VER="${LATEST_TAG#v}"
-          
           CURRENT_VER=$(grep '^pkgver=' PKGBUILD | cut -d'=' -f2)
-          
+
           echo "Current: $CURRENT_VER, Upstream: $NEW_VER"
           echo "new_ver=$NEW_VER" >> $GITHUB_OUTPUT
           echo "current_ver=$CURRENT_VER" >> $GITHUB_OUTPUT
 
-      - name: Update files and push
-        if: steps.check_release.outputs.new_ver != steps.check_release.outputs.current_ver && steps.check_release.outputs.new_ver != ''
-        env:
-          NEW_VER: ${{ steps.check_release.outputs.new_ver }}
+      - name: Update PKGBUILD and .SRCINFO
+        id: update_meta
         run: |
-          DEB_URL="https://github.com/Lemonochka/keqdroid/releases/download/v${NEW_VER}/keqdroid_${NEW_VER}_amd64.deb"
+          TARGET_VER="${{ steps.check_release.outputs.new_ver }}"
+          if [ -z "$TARGET_VER" ]; then
+            TARGET_VER="${{ steps.check_release.outputs.current_ver }}"
+          fi
+
+          DEB_URL="https://github.com/Lemonochka/keqdroid/releases/download/v${TARGET_VER}/keqdroid_${TARGET_VER}_amd64.deb"
           curl -sL -o package.deb "$DEB_URL"
           NEW_SHA256=$(sha256sum package.deb | awk '{print $1}')
           rm package.deb
 
-          sed -i "s/^pkgver=.*/pkgver=${NEW_VER}/" PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${TARGET_VER}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
           sed -i "s/^sha256sums=.*/sha256sums=('${NEW_SHA256}')/" PKGBUILD
 
-          sed -i "s/pkgver = .*/pkgver = ${NEW_VER}/" .SRCINFO
+          sed -i "s/pkgver = .*/pkgver = ${TARGET_VER}/" .SRCINFO
           sed -i "s/pkgrel = .*/pkgrel = 1/" .SRCINFO
           sed -i "s/sha256sums = .*/sha256sums = ${NEW_SHA256}/" .SRCINFO
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add PKGBUILD .SRCINFO
-          git commit -m "chore(auto): bump version to ${NEW_VER}"
-          git push origin master
+          echo "target_ver=$TARGET_VER" >> $GITHUB_OUTPUT
+
+          if [ "${{ steps.check_release.outputs.new_ver }}" != "${{ steps.check_release.outputs.current_ver }}" ] && [ -n "${{ steps.check_release.outputs.new_ver }}" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add PKGBUILD .SRCINFO
+            git commit -m "chore(auto): bump version to ${TARGET_VER}"
+            git push origin master
+          fi
+
+      - name: Build package in Arch Linux container
+        run: |
+          docker run --rm -v "$(pwd):/pkg" -w /pkg archlinux:base-devel bash -c "
+            useradd -m builder && \
+            chown -R builder:builder /pkg && \
+            pacman -Syu --noconfirm --needed sudo git && \
+            echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
+            su builder -c 'makepkg -s --noconfirm'
+          "
+          PKG_FILE=$(ls -1 keqdroid-bin-*.pkg.tar.zst | head -n 1)
+          cp "$PKG_FILE" keqdroid-bin.pkg.tar.zst
+
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: "v${{ steps.update_meta.outputs.target_ver }}"
+        run: |
+          gh release delete "$TAG_NAME" --yes || true
+          gh release create "$TAG_NAME" keqdroid-bin.pkg.tar.zst \
+            --title "Release $TAG_NAME" \
+            --notes "Automated binary package build for Arch Linux."
