@@ -5,19 +5,24 @@ on:
     - cron: '0 4 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        run: |
-          git clone --depth 1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" .
-          git checkout master
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check latest upstream release
         id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LATEST_TAG=$(curl -s https://api.github.com/repos/Lemonochka/keqdroid/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          LATEST_TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/Lemonochka/keqdroid/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
           NEW_VER="${LATEST_TAG#v}"
           CURRENT_VER=$(grep '^pkgver=' PKGBUILD | cut -d'=' -f2)
 
@@ -34,7 +39,7 @@ jobs:
           fi
 
           DEB_URL="https://github.com/Lemonochka/keqdroid/releases/download/v${TARGET_VER}/keqdroid_${TARGET_VER}_amd64.deb"
-          curl -sL -o package.deb "$DEB_URL"
+          curl -sSL -f -o package.deb "$DEB_URL"
           NEW_SHA256=$(sha256sum package.deb | awk '{print $1}')
           rm package.deb
 
@@ -56,17 +61,19 @@ jobs:
             git push origin master
           fi
 
-      - name: Build package in Arch Linux container
+      - name: Build package with makepkg in Arch container
         run: |
-          docker run --rm -v "$(pwd):/pkg" -w /pkg archlinux:base-devel bash -c "
-            useradd -m builder && \
-            chown -R builder:builder /pkg && \
-            pacman -Syu --noconfirm --needed sudo git && \
-            echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
-            su builder -c 'makepkg -s --noconfirm' && \
-            cp keqdroid-bin-[0-9]*.pkg.tar.zst keqdroid-bin.pkg.tar.zst && \
-            chmod 777 keqdroid-bin.pkg.tar.zst /pkg
-          "
+          chmod -R 777 .
+
+          docker run --rm -v "${PWD}:/pkg" -w /pkg archlinux:base-devel bash -c '
+            echo "OPTIONS=(!strip !debug)" >> /etc/makepkg.conf
+            useradd -m builder
+            chown -R builder:builder /pkg
+            su builder -c "makepkg -d -f --noconfirm"
+            PKG_FILE=$(ls keqdroid-bin-[0-9]*.pkg.tar.zst | grep -v -- "-debug" | head -n 1)
+            su builder -c "cp $PKG_FILE keqdroid-bin.pkg.tar.zst"
+            chmod 666 keqdroid-bin.pkg.tar.zst
+          '
 
       - name: Publish GitHub Release
         env:
@@ -76,4 +83,4 @@ jobs:
           gh release delete "$TAG_NAME" --yes || true
           gh release create "$TAG_NAME" keqdroid-bin.pkg.tar.zst \
             --title "Release $TAG_NAME" \
-            --notes "Automated binary package build for Arch Linux."
+            --notes "Automated binary package build for Arch Linux (install via pacman -U)."
