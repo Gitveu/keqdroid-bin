@@ -1,6 +1,6 @@
 pkgbase = keqdroid-bin
 	pkgdesc = Material 3 proxy and VPN client supporting Sing-box, Xray and Mihomo
-	pkgver = 0.39.2
+	pkgver = 0.39.3
 	pkgrel = 1
 	url = https://github.com/Lemonochka/keqdroid
 	arch = x86_64
@@ -24,6 +24,6 @@ pkgbase = keqdroid-bin
 	provides = keqdroid
 	conflicts = keqdroid
 	source = keqdroid-bin-0.25.1.deb::https://github.com/Lemonochka/keqdroid/releases/download/v0.25.1/keqdroid_0.25.1_amd64.deb
-	sha256sums = 2e13052ed6c9f5b37f9b958d6e9f43d60cbfcb3c464c6220da283fef3e626867
+	sha256sums = cf9c3976a5377a6bffae636d4260ef1425fd56c7d8d994888f30dc826c7cf827
 
 pkgname = keqdroid-bin
