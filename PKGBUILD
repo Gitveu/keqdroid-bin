@@ -1,6 +1,6 @@
 # Maintainer: Cybertveu cybertveu@gmail.com
 pkgname=keqdroid-bin
-pkgver=0.40.1
+pkgver=0.40.2
 pkgrel=1
 pkgdesc="Material 3 proxy and VPN client supporting Sing-box, Xray and Mihomo"
 arch=('x86_64')
@@ -29,7 +29,7 @@ optdepends=(
 provides=("${pkgname%-bin}")
 conflicts=("${pkgname%-bin}")
 source=("${pkgname}-${pkgver}.deb::https://github.com/Lemonochka/keqdroid/releases/download/v${pkgver}/keqdroid_${pkgver}_amd64.deb")
-sha256sums=('d585ed67d3f2438935ec2f35af4de71d66889b924a39a9b6f61933eea665742f')
+sha256sums=('8ce0892660d234b3ef9cf0e9419307c8d7bb66cad96e4c54b66c7dc491ccd7c7')
 
 package() {
     ar x "${srcdir}/${pkgname}-${pkgver}.deb"
